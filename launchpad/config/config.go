@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strings"
 
 	"github.com/launchpad-project/cli/launchpad/util"
 	"github.com/spf13/viper"
@@ -27,7 +28,7 @@ var global = &Store{
 	ConfigurableKeys: map[string]bool{
 		"username": true,
 		"password": true,
-		"endpoint": true,
+		"endpoint": false,
 	},
 }
 
@@ -76,13 +77,42 @@ func (s *Store) toMap() interface{} {
 }
 
 func (s *Store) Get(key string) (string, error) {
-	if !s.Data.IsSet(key) || len(s.Data.GetStringMapString(key)) != 0 {
-		return "", ErrConfigKeyNotFound
+	data, err := ioutil.ReadFile(s.Path)
+
+	if err != nil && !os.IsNotExist(err) {
+		print("Fatal error reading global configuration file " + s.Path)
+		panic(err)
 	}
 
-	var value = s.Data.Get(key)
+	var jsonMap map[string]interface{}
+	json.Unmarshal(data, &jsonMap)
 
-	return fmt.Sprint(value), nil
+	var keyPath = strings.Split(key, ".")
+	var keySubPath = jsonMap
+
+	for pos, subPath := range keyPath {
+		_, exists := keySubPath[subPath]
+
+		if !exists {
+			return "", ErrConfigKeyNotFound
+		}
+
+		if pos != len(keyPath)-1 {
+			keySubPath = keySubPath[subPath].(map[string]interface{})
+			continue
+		}
+
+		switch keySubPath[subPath].(type) {
+		case nil:
+			return "null", nil
+		case string, int, int64, float64:
+			return fmt.Sprintf("%v", keySubPath[subPath]), nil
+		default:
+			return "", ErrConfigKeyNotFound
+		}
+	}
+
+	return "", ErrConfigKeyNotFound
 }
 
 func (s *Store) Set(key, value string) error {
