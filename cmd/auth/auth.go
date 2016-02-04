@@ -8,12 +8,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var store = config.Stores["app"]
-
-var AuthCmd = &cobra.Command{
-	Use:   "auth",
-	Short: "Authentication for the Launchpad CLI tool",
-}
+var globalConfig = config.Stores["global"]
 
 var LoginCmd = &cobra.Command{
 	Use:   "login",
@@ -31,21 +26,16 @@ func loginRun(cmd *cobra.Command, args []string) {
 	var username = launchpad.Prompt("Username")
 	var password = launchpad.Prompt("Password")
 
-	store.Data.Set("endpoint", "https://liferay.io/")
-	store.Data.Set("username", username)
-	store.Data.Set("password", password)
-	store.Save()
+	globalConfig.Set("endpoint", launchpad.Endpoint)
+	globalConfig.Set("username", username)
+	globalConfig.Set("password", password)
+	globalConfig.Save()
 
 	fmt.Println("Authentication information saved.")
 }
 
 func logoutRun(cmd *cobra.Command, args []string) {
-	store.Data.Set("username", "")
-	store.Data.Set("password", "")
-	store.Save()
-}
-
-func init() {
-	AuthCmd.AddCommand(LoginCmd)
-	AuthCmd.AddCommand(LogoutCmd)
+	globalConfig.Set("username", "")
+	globalConfig.Set("password", "")
+	globalConfig.Save()
 }

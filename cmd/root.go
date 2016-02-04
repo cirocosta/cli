@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
+	"strings"
 
 	"github.com/launchpad-project/cli/cmd/auth"
 	cconfig "github.com/launchpad-project/cli/cmd/config"
@@ -15,6 +17,13 @@ import (
 	"github.com/launchpad-project/cli/launchpad/util"
 	"github.com/spf13/cobra"
 )
+
+var noAuthWhitelist = map[string]bool{
+	"login":  true,
+	"logout": true,
+	"config": true,
+	"update": true,
+}
 
 var Verbose bool
 
@@ -30,12 +39,32 @@ http://liferay.io`,
 
 var globalStore = config.Stores["global"]
 
+func verifyAuth(commandPath string) {
+	var test = strings.SplitAfterN(commandPath, " ", 2)[1]
+
+	for key := range noAuthWhitelist {
+		if key == test {
+			return
+		}
+	}
+
+	_, err1 := globalStore.GetString("endpoint")
+	_, err2 := globalStore.GetString("username")
+	_, err3 := globalStore.GetString("password")
+
+	if err1 == nil && err2 == nil && err3 == nil {
+		return
+	}
+
+	fmt.Fprintf(os.Stderr, "Please run \"launchpad login\" first.\n")
+	os.Exit(1)
+}
+
 func preRun(cmd *cobra.Command, args []string) {
 	util.Verbose = Verbose
 
 	update.PostUpdate()
-
-	// if != launchpad login or launchpad config and not logged, exit with error
+	verifyAuth(cmd.CommandPath())
 }
 
 func Execute() {
@@ -48,7 +77,8 @@ func init() {
 	config.Setup()
 	RootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "v", false, "verbose output")
 	RootCmd.AddCommand(info.InfoCmd)
-	RootCmd.AddCommand(auth.AuthCmd)
+	RootCmd.AddCommand(auth.LoginCmd)
+	RootCmd.AddCommand(auth.LogoutCmd)
 	RootCmd.AddCommand(services.ServicesCmd)
 	RootCmd.AddCommand(cupdate.UpdateCmd)
 	RootCmd.AddCommand(version.VersionCmd)

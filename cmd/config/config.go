@@ -35,16 +35,16 @@ func configRun(cmd *cobra.Command, args []string) {
 	var key = args[0]
 
 	if len(args) != 1 {
-		configStore.SetAndSave(key, strings.Join(args[1:], " "))
+		configStore.SetAndSavePublicKey(key, strings.Join(args[1:], " "))
 		return
 	}
 
 	if setParam {
-		configStore.SetAndSave(key, launchpad.Prompt(key))
+		configStore.SetAndSavePublicKey(key, launchpad.Prompt(key))
 		return
 	}
 
-	var value, err = configStore.Get(key)
+	var value, err = configStore.GetString(key)
 
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", err)

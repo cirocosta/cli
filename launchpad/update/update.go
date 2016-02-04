@@ -38,7 +38,7 @@ func PostUpdate() {
 }
 
 func GetReleases() []Release {
-	var address = globalConfigStore.Data.GetString("endpoint") + "/releases/dist/channel"
+	var address = globalConfigStore.Get("endpoint") + "/releases/dist/channel"
 	var os = runtime.GOOS
 	var arch = runtime.GOARCH
 

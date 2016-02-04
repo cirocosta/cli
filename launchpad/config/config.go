@@ -9,14 +9,13 @@ import (
 	"strings"
 
 	"github.com/launchpad-project/cli/launchpad/util"
-	"github.com/spf13/viper"
 )
 
 type Store struct {
 	Name             string
 	Path             string
 	ConfigurableKeys map[string]bool
-	Data             *viper.Viper
+	Data             map[string]interface{}
 }
 
 var ErrConfigKeyNotFound = errors.New("key not found")
@@ -25,6 +24,7 @@ var ErrConfigKeyNotConfigurable = errors.New("key not configurable")
 var global = &Store{
 	Name: "global",
 	Path: util.GetUserHomeDir() + "/.launchpad.json",
+	// only string values should be configurable
 	ConfigurableKeys: map[string]bool{
 		"username": true,
 		"password": true,
@@ -36,7 +36,9 @@ var app = &Store{
 	Name: "app",
 	Path: "./launchpad.json",
 	ConfigurableKeys: map[string]bool{
-		"name": true,
+		"name":        true,
+		"description": true,
+		"domain":      true,
 	},
 }
 
@@ -46,7 +48,7 @@ var Stores = map[string]*Store{
 }
 
 func (s *Store) Save() {
-	bin, err := json.MarshalIndent(s.toMap(), "", "    ")
+	bin, err := json.MarshalIndent(s.Data, "", "    ")
 
 	if err != nil {
 		panic(err)
@@ -57,56 +59,36 @@ func (s *Store) Save() {
 	}
 }
 
-func (s *Store) toMap() interface{} {
-	var settings map[string]interface{}
-
-	switch s.Name {
-	case "global":
-		settings = map[string]interface{}{
-			"username": s.Data.GetString("username"),
-			"password": s.Data.GetString("password"),
-			"endpoint": s.Data.GetString("endpoint"),
-		}
-	case "app":
-		settings = map[string]interface{}{
-			"name": s.Data.GetString("name"),
-		}
-	}
-
-	return settings
-}
-
-func (s *Store) Get(key string) (string, error) {
-	data, err := ioutil.ReadFile(s.Path)
+func (s *Store) Init() {
+	content, err := ioutil.ReadFile(s.Path)
 
 	if err != nil && !os.IsNotExist(err) {
 		print("Fatal error reading global configuration file " + s.Path)
 		panic(err)
 	}
 
-	var jsonMap map[string]interface{}
-	json.Unmarshal(data, &jsonMap)
+	json.Unmarshal(content, &s.Data)
+}
 
+func (s *Store) GetString(key string) (string, error) {
 	var keyPath = strings.Split(key, ".")
-	var keySubPath = jsonMap
+	var parent = s.Data
 
 	for pos, subPath := range keyPath {
-		_, exists := keySubPath[subPath]
-
-		if !exists {
+		if _, exists := parent[subPath]; !exists {
 			return "", ErrConfigKeyNotFound
 		}
 
 		if pos != len(keyPath)-1 {
-			keySubPath = keySubPath[subPath].(map[string]interface{})
+			parent = parent[subPath].(map[string]interface{})
 			continue
 		}
 
-		switch keySubPath[subPath].(type) {
+		switch parent[subPath].(type) {
 		case nil:
 			return "null", nil
 		case string, int, int64, float64:
-			return fmt.Sprintf("%v", keySubPath[subPath]), nil
+			return fmt.Sprintf("%v", parent[subPath]), nil
 		default:
 			return "", ErrConfigKeyNotFound
 		}
@@ -115,13 +97,71 @@ func (s *Store) Get(key string) (string, error) {
 	return "", ErrConfigKeyNotFound
 }
 
+func (s *Store) Get(key string) string {
+	value, err := s.GetString(key)
+
+	if err != nil {
+		panic(err)
+	}
+
+	return value
+}
+
+func (s *Store) GetInterface(key string) (interface{}, error) {
+	var keyPath = strings.Split(key, ".")
+	var parent = s.Data
+
+	for pos, subPath := range keyPath {
+		_, exists := parent[subPath]
+
+		if !exists {
+			return "", ErrConfigKeyNotFound
+		}
+
+		if pos != len(keyPath)-1 {
+			parent = parent[subPath].(map[string]interface{})
+			continue
+		}
+
+		return parent[subPath], nil
+	}
+
+	return "", ErrConfigKeyNotFound
+}
+
 func (s *Store) Set(key, value string) error {
+	if s.Data == nil {
+		s.Data = make(map[string]interface{})
+	}
+
+	var keyPath = strings.Split(key, ".")
+	var parent = s.Data
+
+	for pos, subPath := range keyPath {
+		if pos == len(keyPath)-1 {
+			parent[subPath] = value
+			continue
+		}
+
+		switch parent[subPath].(type) {
+		case map[string]interface{}:
+		default:
+			parent[subPath] = make(map[string]interface{})
+		}
+
+		parent = parent[subPath].(map[string]interface{})
+	}
+
+	return nil
+}
+
+func (s *Store) SetPublicKey(key, value string) error {
 	if !s.ConfigurableKeys[key] {
+		util.Debug(fmt.Sprintf("%s", ErrConfigKeyNotConfigurable))
 		return ErrConfigKeyNotConfigurable
 	}
 
-	s.Data.Set(key, value)
-	return nil
+	return s.Set(key, value)
 }
 
 func (s *Store) SetAndSave(key, value string) {
@@ -133,35 +173,16 @@ func (s *Store) SetAndSave(key, value string) {
 	s.Save()
 }
 
-func setupGlobalConfig() {
-	var Data = viper.New()
-	Data.SetConfigName(".launchpad")
-	Data.SetConfigType("json")
-	Data.AddConfigPath("$HOME")
-
-	if err := Data.ReadInConfig(); err != nil {
-		print("Fatal error reading global configuration file (.launchpad.json).")
-		panic(err)
+func (s *Store) SetAndSavePublicKey(key, value string) {
+	if err := s.SetPublicKey(key, value); err != nil {
+		fmt.Fprintf(os.Stderr, "%s\n", err)
+		os.Exit(1)
 	}
 
-	global.Data = Data
-}
-
-func setupAppConfig() {
-	var Data = viper.New()
-	Data.SetConfigName("launchpad")
-	Data.SetConfigType("json")
-	Data.AddConfigPath(".")
-
-	if err := Data.ReadInConfig(); err != nil && !os.IsNotExist(err) {
-		print("Fatal error reading project configuration file (launchpad.json).")
-		panic(err)
-	}
-
-	app.Data = Data
+	s.Save()
 }
 
 func Setup() {
-	setupGlobalConfig()
-	setupAppConfig()
+	global.Init()
+	app.Init()
 }

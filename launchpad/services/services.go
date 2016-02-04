@@ -29,9 +29,9 @@ type Pod struct {
 var globalConfig = config.Stores["global"]
 
 func GetPods() {
-	var address = globalConfig.Data.GetString("endpoint") + "/_admin/pods"
-	var username = globalConfig.Data.GetString("username")
-	var password = globalConfig.Data.GetString("password")
+	var address = globalConfig.Get("endpoint") + "/_admin/pods"
+	var username = globalConfig.Get("username")
+	var password = globalConfig.Get("password")
 	var l = client.Url(address, nil)
 
 	l.Auth(username, password)
