@@ -11,10 +11,9 @@ import (
 	"github.com/launchpad-project/cli/cmd/services"
 	cupdate "github.com/launchpad-project/cli/cmd/update"
 	"github.com/launchpad-project/cli/cmd/version"
+	"github.com/launchpad-project/cli/config"
 	"github.com/launchpad-project/cli/launchpad"
-	"github.com/launchpad-project/cli/launchpad/config"
-	"github.com/launchpad-project/cli/launchpad/update"
-	"github.com/launchpad-project/cli/launchpad/util"
+	"github.com/launchpad-project/cli/util"
 	"github.com/spf13/cobra"
 )
 
@@ -25,8 +24,7 @@ var noAuthWhitelist = map[string]bool{
 	"update": true,
 }
 
-var Verbose bool
-
+// RootCmd is the main command for the CLI
 var RootCmd = &cobra.Command{
 	Use:   "launchpad",
 	Short: "Launchpad CLI tool",
@@ -61,12 +59,10 @@ func verifyAuth(commandPath string) {
 }
 
 func preRun(cmd *cobra.Command, args []string) {
-	util.Verbose = Verbose
-
-	update.PostUpdate()
 	verifyAuth(cmd.CommandPath())
 }
 
+// Execute is the Entry-point for the CLI
 func Execute() {
 	if err := RootCmd.Execute(); err != nil {
 		os.Exit(-1)
@@ -75,7 +71,7 @@ func Execute() {
 
 func init() {
 	config.Setup()
-	RootCmd.PersistentFlags().BoolVarP(&Verbose, "verbose", "v", false, "verbose output")
+	RootCmd.PersistentFlags().BoolVarP(&util.Verbose, "verbose", "v", false, "verbose output")
 	RootCmd.AddCommand(info.InfoCmd)
 	RootCmd.AddCommand(auth.LoginCmd)
 	RootCmd.AddCommand(auth.LogoutCmd)

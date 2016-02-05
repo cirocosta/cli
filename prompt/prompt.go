@@ -1,4 +1,4 @@
-package launchpad
+package prompt
 
 import (
 	"fmt"
@@ -9,11 +9,21 @@ import (
 	"github.com/bgentry/speakeasy"
 )
 
+var secretKeys = []string{
+	"password",
+	"token",
+	"secret",
+}
+
 func isSecretKey(key string) bool {
-	var match, _ = regexp.MatchString("(password|token|secret)", strings.ToLower(key))
+	var match, _ = regexp.MatchString(
+		"("+strings.Join(secretKeys, "|")+")",
+		strings.ToLower(key))
 	return match
 }
 
+// Prompt returns a prompt to receive the value of a parameter.
+// If the key is on a secret keys list it suppresses the feedback.
 func Prompt(param string) string {
 
 	var value string

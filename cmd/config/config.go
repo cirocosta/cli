@@ -5,26 +5,41 @@ import (
 	"os"
 	"strings"
 
-	"github.com/launchpad-project/cli/launchpad"
-	c "github.com/launchpad-project/cli/launchpad/config"
+	c "github.com/launchpad-project/cli/config"
+	"github.com/launchpad-project/cli/prompt"
 	"github.com/spf13/cobra"
 )
 
 var (
+	listParam   bool
 	setParam    bool
 	globalParam bool
 	configStore = c.Stores["app"]
 )
 
+// ConfigCmd is used for configuring the CLI tool and app
 var ConfigCmd = &cobra.Command{
 	Use:   "config",
 	Short: "Configuration for the Launchpad CLI tool",
 	Run:   configRun,
 }
 
+func listKeys() {
+	for key, configurable := range configStore.ConfigurableKeys {
+		if configurable {
+			fmt.Println(key, "=", configStore.Get(key))
+		}
+	}
+}
+
 func configRun(cmd *cobra.Command, args []string) {
 	if globalParam {
 		configStore = c.Stores["global"]
+	}
+
+	if listParam {
+		listKeys()
+		return
 	}
 
 	if len(args) == 0 {
@@ -40,7 +55,7 @@ func configRun(cmd *cobra.Command, args []string) {
 	}
 
 	if setParam {
-		configStore.SetAndSavePublicKey(key, launchpad.Prompt(key))
+		configStore.SetAndSavePublicKey(key, prompt.Prompt(key))
 		return
 	}
 
@@ -55,6 +70,7 @@ func configRun(cmd *cobra.Command, args []string) {
 }
 
 func init() {
-	ConfigCmd.Flags().BoolVar(&setParam, "set", false, "Set property")
-	ConfigCmd.Flags().BoolVar(&globalParam, "global", false, "Set application global config property")
+	ConfigCmd.Flags().BoolVarP(&listParam, "list", "l", false, "list all")
+	ConfigCmd.Flags().BoolVar(&setParam, "set", false, "set property")
+	ConfigCmd.Flags().BoolVar(&globalParam, "global", false, "set application global config property")
 }

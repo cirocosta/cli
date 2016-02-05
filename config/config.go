@@ -8,9 +8,10 @@ import (
 	"os"
 	"strings"
 
-	"github.com/launchpad-project/cli/launchpad/util"
+	"github.com/launchpad-project/cli/util"
 )
 
+// Store is the structure for the config object
 type Store struct {
 	Name             string
 	Path             string
@@ -18,7 +19,10 @@ type Store struct {
 	Data             map[string]interface{}
 }
 
+// ErrConfigKeyNotFound is used when a key is not found on the config
 var ErrConfigKeyNotFound = errors.New("key not found")
+
+// ErrConfigKeyNotConfigurable is used when a key is not configurable
 var ErrConfigKeyNotConfigurable = errors.New("key not configurable")
 
 var global = &Store{
@@ -42,11 +46,13 @@ var app = &Store{
 	},
 }
 
+// Stores sets the map of available config stores
 var Stores = map[string]*Store{
 	"global": global,
 	"app":    app,
 }
 
+// Save saves the config file
 func (s *Store) Save() {
 	bin, err := json.MarshalIndent(s.Data, "", "    ")
 
@@ -59,6 +65,7 @@ func (s *Store) Save() {
 	}
 }
 
+// Init reads the config file
 func (s *Store) Init() {
 	content, err := ioutil.ReadFile(s.Path)
 
@@ -70,6 +77,7 @@ func (s *Store) Init() {
 	json.Unmarshal(content, &s.Data)
 }
 
+// GetString gets a string from the config object
 func (s *Store) GetString(key string) (string, error) {
 	var keyPath = strings.Split(key, ".")
 	var parent = s.Data
@@ -97,6 +105,7 @@ func (s *Store) GetString(key string) (string, error) {
 	return "", ErrConfigKeyNotFound
 }
 
+// Get gets a string from the config object and panics when not found
 func (s *Store) Get(key string) string {
 	value, err := s.GetString(key)
 
@@ -107,6 +116,7 @@ func (s *Store) Get(key string) string {
 	return value
 }
 
+// GetInterface gets an interface from the config object
 func (s *Store) GetInterface(key string) (interface{}, error) {
 	var keyPath = strings.Split(key, ".")
 	var parent = s.Data
@@ -129,6 +139,7 @@ func (s *Store) GetInterface(key string) (interface{}, error) {
 	return "", ErrConfigKeyNotFound
 }
 
+// Set sets the value for a given key
 func (s *Store) Set(key, value string) error {
 	if s.Data == nil {
 		s.Data = make(map[string]interface{})
@@ -155,15 +166,17 @@ func (s *Store) Set(key, value string) error {
 	return nil
 }
 
+// SetPublicKey sets the value for a given key
+// (or fail if it the key is not public)
 func (s *Store) SetPublicKey(key, value string) error {
 	if !s.ConfigurableKeys[key] {
-		util.Debug(fmt.Sprintf("%s", ErrConfigKeyNotConfigurable))
 		return ErrConfigKeyNotConfigurable
 	}
 
 	return s.Set(key, value)
 }
 
+// SetAndSave sets the value for a given key and save config
 func (s *Store) SetAndSave(key, value string) {
 	if err := s.Set(key, value); err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", err)
@@ -173,6 +186,8 @@ func (s *Store) SetAndSave(key, value string) {
 	s.Save()
 }
 
+// SetAndSavePublicKey sets the value for a given key and save config
+// (or fail if it the key is not public)
 func (s *Store) SetAndSavePublicKey(key, value string) {
 	if err := s.SetPublicKey(key, value); err != nil {
 		fmt.Fprintf(os.Stderr, "%s\n", err)
@@ -182,6 +197,7 @@ func (s *Store) SetAndSavePublicKey(key, value string) {
 	s.Save()
 }
 
+// Setup the global and app configs.
 func Setup() {
 	global.Init()
 	app.Init()

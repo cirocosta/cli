@@ -1,10 +1,10 @@
 package launchpad
 
 const (
-	Version       = "master"
-	UserAgent     = "Launchpad CLI cmd (" + Version + ")"
-	Endpoint      = "https://liferay.io"
-	ConfigVersion = "1"
+	// Version of the Launchpad CLI
+	Version = "master"
+	// UserAgent of the Launchpad CLI
+	UserAgent = "Launchpad/" + Version + " (+https://launchpad.io)"
+	// Endpoint is the gateway to the requests
+	Endpoint = "https://liferay.io"
 )
-
-var Verbose = false

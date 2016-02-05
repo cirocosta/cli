@@ -4,10 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/launchpad-project/cli/launchpad/client"
-	"github.com/launchpad-project/cli/launchpad/config"
+	"github.com/launchpad-project/cli/config"
+	"github.com/launchpad-project/cli/launchpad"
 )
 
+// PodConfig structure
 type PodConfig struct {
 	Visibility     bool              `json:"visibility"`
 	AssetsPath     string            `json:"assetsPath"`
@@ -20,6 +21,7 @@ type PodConfig struct {
 	WebPath        string            `json:"webPath"`
 }
 
+// Pod structure
 type Pod struct {
 	PodConfig PodConfig `json:"config"`
 	Name      string    `json:"name"`
@@ -28,18 +30,23 @@ type Pod struct {
 
 var globalConfig = config.Stores["global"]
 
+// GetPods lists the pods
 func GetPods() {
 	var address = globalConfig.Get("endpoint") + "/_admin/pods"
 	var username = globalConfig.Get("username")
 	var password = globalConfig.Get("password")
-	var l = client.Url(address, nil)
+	var l, err = launchpad.URL(address, nil)
+
+	if err != nil {
+		panic(err)
+	}
 
 	l.Auth(username, password)
 	l.Get()
 
 	pods := *new([]Pod)
 
-	if err := l.ResponseJson(&pods); err != nil {
+	if err := l.DecodeJSON(&pods); err != nil {
 		panic(err)
 	}
 

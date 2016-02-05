@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/launchpad-project/cli/launchpad/config"
-	"github.com/launchpad-project/cli/launchpad/util"
+	"github.com/launchpad-project/cli/config"
+	"github.com/launchpad-project/cli/util"
 	"github.com/mitchellh/mapstructure"
 )
 
+// Service structure
 type Service struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
@@ -29,6 +30,7 @@ func printNotEmpty(name, key string) {
 	}
 }
 
+// GetCurrentAppInfo lists the information described on the project's launchpad.json
 func GetCurrentAppInfo() {
 	if len(appConfig.Data) == 0 {
 		fmt.Fprintf(os.Stderr, "Application not found.\n")
