@@ -149,5 +149,14 @@ func printHTTPError(request *launchpad.Launchpad) {
 }
 
 func printHTTPVerbose(request *launchpad.Launchpad, body []byte) {
+	// if request.RequestBody != nil {
+	// 	buf := &bytes.Buffer{}
+	// 	buf.ReadFrom(request.RequestBody)
+	// 	verbose.Debug("Request Body:\n" + buf.String())
+	// }
+	//https://groups.google.com/forum/#!topic/golang-nuts/BzDAg0CFqyk
+
+	// string(body)? only if the response type is string (and / or small?)
+
 	verbose.Debug("Response Body:\n" + string(body))
 }
