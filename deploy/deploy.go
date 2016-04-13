@@ -35,13 +35,6 @@ type DeployFlags struct {
 	Hooks bool
 }
 
-// WriteCounter is a writer for writing to the progress bar
-type WriteCounter struct {
-	Total    uint64
-	Size     uint64
-	progress *progress.Bar
-}
-
 // ErrDeploy is a generic error triggered when any deploy error happens
 var ErrDeploy = errors.New("Error during deploy")
 
@@ -84,56 +77,19 @@ func Only(container string, df *DeployFlags) error {
 
 	var projectID = config.Stores["project"].Get("id")
 
-	err = projects.Validate(projectID)
+	err = validateOrCreateProject(projectID, config.Stores["project"].Get("name"))
 
-	switch err {
-	case projects.ErrProjectAlreadyExists:
-		break
-	case nil:
-		err = projects.Create(projectID, config.Stores["project"].Get("name"))
-
-		if err != nil {
-			return err
-		} else {
-			fmt.Println("New project created")
-		}
-	default:
+	if err != nil {
 		return err
 	}
 
-	err = containers.Validate(projectID, deploy.Container.ID)
+	err = validateOrCreateContainer(projectID, deploy.Container)
 
-	switch err {
-	case containers.ErrContainerAlreadyExists:
-		err = nil
-		break
-	case nil:
-		err = containers.Install(projectID, deploy.Container)
-
-		if err != nil {
-			return err
-		} else {
-			fmt.Println("New container installed")
-		}
-	default:
+	if err != nil {
 		return err
 	}
 
-	var containerHooks = deploy.Container.Hooks
-
-	if df.Hooks && containerHooks != nil && containerHooks.BeforeDeploy != "" {
-		err = hooks.Run(containerHooks.BeforeDeploy)
-	}
-
-	if err == nil {
-		err = deploy.Only()
-	}
-
-	if err == nil && df.Hooks && containerHooks != nil && containerHooks.AfterDeploy != "" {
-		err = hooks.Run(containerHooks.AfterDeploy)
-	}
-
-	return err
+	return runDeploy(deploy, df)
 }
 
 // New Deploy instance
@@ -144,6 +100,10 @@ func New(container string) (*Deploy, error) {
 	}
 
 	var err = containers.GetConfig(deploy.ContainerPath, &deploy.Container)
+
+	if err != nil {
+		return nil, err
+	}
 
 	return deploy, err
 }
@@ -168,7 +128,7 @@ func (d *Deploy) Deploy(pod string) (err error) {
 
 	apihelper.Auth(req)
 
-	w := &WriteCounter{
+	w := &writeCounter{
 		progress: d.progress,
 		Size:     uint64(d.PackageSize),
 	}
@@ -192,7 +152,7 @@ func (d *Deploy) Deploy(pod string) (err error) {
 	}
 
 	if err == nil {
-		fmt.Printf(fmt.Sprintf("Ready! %v.%v.liferay.io\n", d.Container, projectID))
+		fmt.Printf(fmt.Sprintf("Ready! %v.%v.liferay.io\n", d.Container.ID, projectID))
 	}
 
 	return err
@@ -217,19 +177,15 @@ func (d *Deploy) Only() error {
 
 // Zip packages a POD to a .pod package
 func (d *Deploy) Zip(dest string) (err error) {
-	var c containers.Container
 	d.progress.Reset("Zipping", "")
 	dest, _ = filepath.Abs(dest)
 
-	c.DeployIgnore = append(c.DeployIgnore, pod.CommonIgnorePatterns...)
-
-	// avoid zipping itself 'til starvation
-	c.DeployIgnore = append(c.DeployIgnore, dest)
+	var ignorePatterns = append(d.Container.DeployIgnore, pod.CommonIgnorePatterns...)
 
 	d.PackageSize, err = pod.Compress(
 		dest,
 		d.ContainerPath,
-		c.DeployIgnore,
+		ignorePatterns,
 		d.progress)
 
 	if err == nil {
@@ -241,18 +197,56 @@ func (d *Deploy) Zip(dest string) (err error) {
 	return err
 }
 
-// Write to the progress bar
-func (wc *WriteCounter) Write(p []byte) (int, error) {
-	n := len(p)
-	wc.Total += uint64(n)
-	perc := uint64(progress.Total) * wc.Total / wc.Size
+func runDeploy(deploy *Deploy, df *DeployFlags) (err error) {
+	var ch = deploy.Container.Hooks
 
-	wc.progress.Append = fmt.Sprintf(
-		"%s/%s",
-		humanize.Bytes(wc.Total),
-		humanize.Bytes(wc.Size))
+	if df.Hooks && ch != nil && ch.BeforeDeploy != "" {
+		err = hooks.Run(ch.BeforeDeploy)
+	}
 
-	wc.progress.Set(int(perc))
+	if err == nil {
+		err = deploy.Only()
+	}
 
-	return n, nil
+	if err == nil && df.Hooks && ch != nil && ch.AfterDeploy != "" {
+		err = hooks.Run(ch.AfterDeploy)
+	}
+
+	return err
+}
+
+func validateOrCreateContainer(projectID string, c containers.Container) (err error) {
+	err = containers.Validate(projectID, c.ID)
+
+	if err == containers.ErrContainerAlreadyExists {
+		return nil
+	}
+
+	if err == nil {
+		err = containers.Install(projectID, c)
+
+		if err == nil {
+			fmt.Println("New container installed")
+		}
+	}
+
+	return err
+}
+
+func validateOrCreateProject(projectID, projectName string) (err error) {
+	err = projects.Validate(projectID)
+
+	if err == projects.ErrProjectAlreadyExists {
+		return nil
+	}
+
+	if err == nil {
+		err = projects.Create(projectID, config.Stores["project"].Get("name"))
+
+		if err == nil {
+			fmt.Println("New project created")
+		}
+	}
+
+	return err
 }
