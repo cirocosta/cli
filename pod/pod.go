@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/dustin/go-humanize"
 	"github.com/launchpad-project/cli/progress"
@@ -213,6 +214,18 @@ func (p *pod) walkFunc(path string, fi os.FileInfo, ierr error) error {
 
 	if fi.IsDir() {
 		return nil
+	}
+
+	if fi.Mode()&os.ModeSymlink == os.ModeSymlink {
+		var linkDest string
+
+		linkDest, err = os.Readlink(path)
+
+		if err == nil {
+			_, err = io.Copy(writer, strings.NewReader(linkDest))
+		}
+
+		return err
 	}
 
 	return copy(writer, path, relative)
