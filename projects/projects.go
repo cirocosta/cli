@@ -19,6 +19,7 @@ type Project struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
 	Domain      string `json:"domain"`
+	State       string `json:"state"`
 	Description string `json:"description,omitempty"`
 }
 
@@ -64,7 +65,7 @@ func List() {
 	apihelper.DecodeJSONOrExit(req, &projects)
 
 	for _, project := range projects {
-		fmt.Fprintln(outStream, project.ID+" ("+project.Name+")")
+		fmt.Fprintln(outStream, project.ID+"\t"+project.ID+".liferay.io ("+project.Name+") "+project.State)
 	}
 
 	fmt.Fprintln(outStream, "total", len(projects))
@@ -87,24 +88,26 @@ func Validate(projectID string) (err error) {
 
 	err = req.Get()
 
-	// @Everything here is to be refactored, this is a hack
-	if err == launchpad.ErrUnexpectedResponse {
-		body, err := ioutil.ReadAll(req.Response.Body)
-
-		if err != nil {
-			return err
-		}
-
-		b := string(body)
-
-		if strings.Contains(b, "invalidProjectId") {
-			return ErrInvalidProjectID
-		}
-
-		if strings.Contains(b, "projectAlreadyExists") {
-			return ErrProjectAlreadyExists
-		}
+	if err != launchpad.ErrUnexpectedResponse {
+		return err
 	}
 
+	// maybe use module 'launchpaderror' to process this
+	// or instead of a module, a function on apihelper
+	body, err := ioutil.ReadAll(req.Response.Body)
+
+	if err != nil {
+		return err
+	}
+
+	b := string(body)
+
+	if strings.Contains(b, "invalidProjectId") {
+		return ErrInvalidProjectID
+	}
+
+	if strings.Contains(b, "projectAlreadyExists") {
+		return ErrProjectAlreadyExists
+	}
 	return err
 }
