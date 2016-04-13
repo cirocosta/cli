@@ -1,10 +1,12 @@
 package deploy
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"mime/multipart"
 	"os"
 	"path"
 	"path/filepath"
@@ -136,9 +138,27 @@ func (d *Deploy) Deploy(pod string) (err error) {
 	d.progress.Reset("Uploading", "")
 	file, err = os.Open(pod)
 
-	if err == nil {
-		req.Body(io.TeeReader(file, w))
+	body := &bytes.Buffer{}
+	writer := multipart.NewWriter(body)
+	part, errCreate := writer.CreateFormFile("pod", "container.pod")
+
+	if errCreate != nil {
+		return errCreate
 	}
+
+	_, errCopy := io.Copy(part, file)
+
+	if errCopy != nil {
+		return errCopy
+	}
+
+	writer.Close()
+
+	if err == nil {
+		req.Body(io.TeeReader(body, w))
+	}
+
+	req.Headers.Set("Content-Type", writer.FormDataContentType())
 
 	if err == nil {
 		err = apihelper.Validate(req, req.Post())
