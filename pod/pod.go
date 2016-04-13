@@ -14,6 +14,7 @@ import (
 )
 
 type pod struct {
+	Dest             string
 	Source           string
 	Writer           *zip.Writer
 	NumberFiles      int
@@ -56,6 +57,7 @@ func Compress(dest,
 	verbose.Debug("Saving container to", file.Name())
 
 	var pkg = &pod{
+		Dest:        dest,
 		Source:      src,
 		Writer:      zip.NewWriter(file),
 		ignoreRules: irules,
@@ -118,7 +120,8 @@ func (p *pod) countWalkFunc(path string, fi os.FileInfo, ierr error) error {
 	}
 
 	// Pod, Jar is a .tar bomb, err... a .zip bomb!
-	if relative == "." {
+	// avoid zipping itself 'til starvation also
+	if relative == "." || relative == p.Dest {
 		return nil
 	}
 
@@ -159,7 +162,8 @@ func (p *pod) walkFunc(path string, fi os.FileInfo, ierr error) error {
 	}
 
 	// Pod, Jar is a .tar bomb, err... a .zip bomb!
-	if relative == "." {
+	// avoid zipping itself 'til starvation also
+	if relative == "." || relative == p.Dest {
 		return nil
 	}
 
