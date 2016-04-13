@@ -29,6 +29,7 @@ type Container struct {
 	ID           string       `json:"id"`
 	Name         string       `json:"name"`
 	Bootstrap    string       `json:"bootstrap"`
+	State        string       `json:"state"`
 	Template     string       `json:"template"`
 	Type         string       `json:"type"`
 	Hooks        *hooks.Hooks `json:"hooks,omitempty"`
@@ -121,9 +122,9 @@ func GetStatus(projectID, containerID string) {
 }
 
 // List of containers of a given project
-func List(id string) {
+func List(projectID string) {
 	var containers Containers
-	var req = apihelper.URL("/api/projects/" + id + "/containers")
+	var req = apihelper.URL("/api/projects/" + projectID + "/containers")
 
 	apihelper.Auth(req)
 	apihelper.ValidateOrExit(req, req.Get())
@@ -138,7 +139,7 @@ func List(id string) {
 
 	for _, k := range keys {
 		container := containers[k]
-		fmt.Fprintln(outStream, container.ID+" ("+container.Name+")")
+		fmt.Fprintln(outStream, container.ID+"\t"+container.ID+"."+projectID+".liferay.io ("+container.Name+") "+container.State)
 	}
 
 	fmt.Fprintln(outStream, "total", len(containers))
