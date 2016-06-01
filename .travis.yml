@@ -6,3 +6,5 @@ before_install:
   - go get github.com/mattn/goveralls
 after_success:
   - sh `pwd`/scripts/coverage --coveralls
+sudo: required
+
